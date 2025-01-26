@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clicker Counter with Supabase</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: linear-gradient(to right, #ffecd2, #fcb69f);
+      font-family: 'Arial', sans-serif;
+    }
+    .container {
+      text-align: center;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      width: 300px;
+    }
+    .tabs {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 20px;
+    }
+    .tabs button {
+      background: none;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 10px;
+    }
+    .tabs button.active {
+      border-bottom: 2px solid #ff7f50;
+      font-weight: bold;
+    }
+    .section {
+      display: none;
+    }
+    .section.active {
+      display: block;
+    }
+    .counter {
+      font-size: 3rem;
+      margin-bottom: 10px;
+    }
+    .clicks-per-second {
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+    }
+    .button {
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      color: #fff;
+      background: #ff7f50;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin: 5px;
+    }
+    .button:hover {
+      background: #ff6347;
+    }
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    #notification {
+      margin-top: 20px;
+      color: #ff6347;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="tabs">
+      <button class="active" onclick="showSection('counter')">Counter</button>
+      <button onclick="showSection('login')">Login</button>
+      <button onclick="showSection('register')">Register</button>
+    </div>
+    
+    <div id="counter" class="section active">
+      <div class="counter" id="counter-value">0</div>
+      <div class="clicks-per-second" id="clicks-per-second">0 Clicks per Second</div>
+      <button class="button" onclick="increaseCounter()">Click Me!</button>
+      <button class="button" onclick="resetCounter()">Reset</button>
+      <button class="button" onclick="saveResult()">Save Result</button>
+    </div>
+    
+    <div id="login" class="section">
+      <form onsubmit="loginUser(event)">
+        <div class="form-group">
+          <label for="login-email">Email:</label>
+          <input type="email" id="login-email" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password:</label>
+          <input type="password" id="login-password" required>
+        </div>
+        <button class="button" type="submit">Login</button>
+      </form>
+    </div>
+    
+    <div id="register" class="section">
+      <form onsubmit="registerUser(event)">
+        <div class="form-group">
+          <label for="register-email">Email:</label>
+          <input type="email" id="register-email" required>
+        </div>
+        <div class="form-group">
+          <label for="register-password">Password:</label>
+          <input type="password" id="register-password" required>
+        </div>
+        <div class="form-group">
+          <label for="register-confirm-password">Confirm Password:</label>
+          <input type="password" id="register-confirm-password" required>
+        </div>
+        <button class="button" type="submit">Register</button>
+      </form>
+    </div>
+    <div id="notification"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script>
+    const supabaseUrl = 'https://omzcwddvevqiwndiomnk.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9temN3ZGR2ZXZxaXduZGlvbW5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc4ODUwNTMsImV4cCI6MjA1MzQ2MTA1M30.HOtUnFUEJ9W9ke_746IaGIs0jRgq6_QVcPrgTb2J4Pw';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    let count = 0;
+    let startTime = Date.now();
+    let user = null;
+
+    function increaseCounter() {
+      count++;
+      document.getElementById('counter-value').innerText = count;
+
+      const currentTime = Date.now();
+      const elapsedTime = (currentTime - startTime) / 1000; // in seconds
+      const clicksPerSecond = (count / elapsedTime).toFixed(2);
+
+      document.getElementById('clicks-per-second').innerText = `${clicksPerSecond} Clicks per Second`;
+    }
+
+    function resetCounter() {
+      count = 0;
+      startTime = Date.now();
+      document.getElementById('counter-value').innerText = count;
+      document.getElementById('clicks-per-second').innerText = '0 Clicks per Second';
+    }
+
+    function showSection(section) {
+      const sections = document.querySelectorAll('.section');
+      sections.forEach(sec => sec.classList.remove('active'));
+
+      const buttons = document.querySelectorAll('.tabs button');
+      buttons.forEach(btn => btn.classList.remove('active'));
+
+      document.getElementById(section).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    async function registerUser(event) {
+      event.preventDefault();
+      const email = document.getElementById('register-email').value;
+      const password = document.getElementById('register-password').value;
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        displayNotification('Error: ' + error.message);
+      } else {
+        displayNotification('User registered successfully!');
+      }
+    }
+
+    async function loginUser(event) {
+      event.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      const { user, error } = await supabase.auth.signIn({
+        email,
+        password,
+      });
+
+      if (error) {
+        displayNotification('Error: ' + error.message);
+      } else {
+        user = user;
+        displayNotification('User logged in successfully!');
+      }
+    }
+
+    async function saveResult() {
+      if (!user) {
+        displayNotification('Please log in to save your result.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('clicker_results')
+        .insert([{ user_id: user.id, count }]);
+
+      if (error) {
+        displayNotification('Error: ' + error.message);
+      } else {
+        displayNotification('Result saved successfully!');
+      }
+    }
+
+    function displayNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.innerText = message;
+      setTimeout(() => {
+        notification.innerText = '';
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
